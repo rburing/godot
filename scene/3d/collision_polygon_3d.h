@@ -37,7 +37,6 @@
 class CollisionObject3D;
 class CollisionPolygon3D : public Node3D {
 	GDCLASS(CollisionPolygon3D, Node3D);
-	real_t margin = 0.04;
 
 protected:
 	real_t depth = 1.0;
@@ -70,9 +69,6 @@ public:
 	bool is_disabled() const;
 
 	virtual AABB get_item_rect() const;
-
-	real_t get_margin() const;
-	void set_margin(real_t p_margin);
 
 	TypedArray<String> get_configuration_warnings() const override;
 

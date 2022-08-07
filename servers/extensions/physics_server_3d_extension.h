@@ -224,9 +224,6 @@ public:
 	EXBIND2(shape_set_data, RID, const Variant &)
 	EXBIND2(shape_set_custom_solver_bias, RID, real_t)
 
-	EXBIND2(shape_set_margin, RID, real_t)
-	EXBIND1RC(real_t, shape_get_margin, RID)
-
 	EXBIND1RC(ShapeType, shape_get_type, RID)
 	EXBIND1RC(Variant, shape_get_data, RID)
 	EXBIND1RC(real_t, shape_get_custom_solver_bias, RID)

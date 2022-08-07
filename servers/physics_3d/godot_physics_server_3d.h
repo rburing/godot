@@ -96,9 +96,6 @@ public:
 	virtual ShapeType shape_get_type(RID p_shape) const override;
 	virtual Variant shape_get_data(RID p_shape) const override;
 
-	virtual void shape_set_margin(RID p_shape, real_t p_margin) override;
-	virtual real_t shape_get_margin(RID p_shape) const override;
-
 	virtual real_t shape_get_custom_solver_bias(RID p_shape) const override;
 
 	/* SPACE API */

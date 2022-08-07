@@ -127,13 +127,6 @@ Variant GodotPhysicsServer3D::shape_get_data(RID p_shape) const {
 	return shape->get_data();
 };
 
-void GodotPhysicsServer3D::shape_set_margin(RID p_shape, real_t p_margin) {
-}
-
-real_t GodotPhysicsServer3D::shape_get_margin(RID p_shape) const {
-	return 0.0;
-}
-
 real_t GodotPhysicsServer3D::shape_get_custom_solver_bias(RID p_shape) const {
 	const GodotShape3D *shape = shape_owner.get_or_null(p_shape);
 	ERR_FAIL_COND_V(!shape, 0);

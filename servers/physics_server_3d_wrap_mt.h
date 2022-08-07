@@ -90,9 +90,6 @@ public:
 	FUNC2(shape_set_data, RID, const Variant &);
 	FUNC2(shape_set_custom_solver_bias, RID, real_t);
 
-	FUNC2(shape_set_margin, RID, real_t)
-	FUNC1RC(real_t, shape_get_margin, RID)
-
 	FUNC1RC(ShapeType, shape_get_type, RID);
 	FUNC1RC(Variant, shape_get_data, RID);
 	FUNC1RC(real_t, shape_get_custom_solver_bias, RID);

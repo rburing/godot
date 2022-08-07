@@ -41,7 +41,6 @@ class Shape3D : public Resource {
 	RES_BASE_EXTENSION("shape");
 	RID shape;
 	real_t custom_bias = 0.0;
-	real_t margin = 0.04;
 
 	Ref<ArrayMesh> debug_mesh_cache;
 

@@ -30,6 +30,7 @@
 
 #include "geometry_3d.h"
 
+#include "quartic_solver.h"
 #include "thirdparty/misc/clipper.hpp"
 #include "thirdparty/misc/polypartition.h"
 
@@ -136,6 +137,179 @@ real_t Geometry3D::get_closest_distance_between_segments(const Vector3 &p_p0, co
 	get_closest_points_between_segments(p_p0, p_p1, p_q0, p_q1, ps, qt);
 	Vector3 st = qt - ps;
 	return st.length();
+}
+
+void get_points_from_segment_parameter(const Vector3 &p_circle_center, const Vector3 &p_circle_normal, const real_t p_circle_radius, const Vector3 &p_segment_begin, const Vector3 &p_segment_end, const real_t p_segment_parameter, Vector3 &r_circle_closest, Vector3 &r_segment_closest) {
+	Vector3 D = p_segment_begin - p_circle_center; // TODO: pass in instead like Eberly?
+	Vector3 segment_direction = p_segment_end - p_segment_begin;
+	Vector3 delta = D + p_segment_parameter * segment_direction; // TODO: like this?
+	// TODO: check for segment instead of line
+	r_segment_closest = p_circle_center + delta;
+	delta -= p_circle_normal.dot(delta) * p_circle_normal;
+	delta.normalize();
+	r_circle_closest = p_circle_center + p_circle_radius * delta;
+}
+
+Vector3 get_some_orthogonal_vector(const Vector3 &p_vector, bool p_unit_length) {
+	// Taken from David Eberly's ...
+
+	// Construct a single vector orthogonal to the nonzero input vector. If
+	// the maximum absolute component occurs at index i, then the orthogonal
+	// vector U has u[i] = v[i+1], u[i+1] = -v[i], and all other components
+	// zero. The index addition i+1 is computed modulo N. If the input vector
+	// is zero, the output vector is zero. If the input vector is empty, the
+	// output vector is empty. If you want the output to be a unit-length
+	// vector, set unitLength to 'true'.
+
+	real_t cmax = 0.0;
+	size_t imax = 0;
+	for (size_t i = 0; i < 3; ++i) {
+		real_t c = std::fabs(p_vector[i]);
+		if (c > cmax) {
+			cmax = c;
+			imax = i;
+		}
+	}
+
+	Vector3 result;
+	if (cmax > 0.0) {
+		size_t inext = imax + 1;
+		if (inext == 3) {
+			inext = 0;
+		}
+		result[imax] = p_vector[inext];
+		result[inext] = -p_vector[imax];
+		if (p_unit_length) {
+			result.normalize();
+		}
+	}
+	return result;
+}
+
+struct ClosestInfo {
+	real_t sqr_distance = 0.0;
+	Vector3 segment_closest;
+	Vector3 circle_closest;
+	//bool equidistant = false;
+};
+
+struct ClosestInfoSort {
+	bool operator()(const ClosestInfo p_a, const ClosestInfo p_b) const {
+		return p_a.sqr_distance < p_b.sqr_distance;
+	}
+};
+
+void Geometry3D::get_closest_points_between_segment_and_circle(const Vector3 &p_circle_center, const Vector3 &p_circle_normal, const real_t p_circle_radius, const Vector3 &p_segment_begin, const Vector3 &p_segment_end, Vector3 &r_circle_closest, Vector3 &r_segment_closest) {
+	// Based on David Eberly's DistLine3Circle3: Distance between a line and a circle, polynomial-based algorithm
+
+	// TODO: can return up to 2 points. change signature.
+
+	Vector3 segment_direction = p_segment_end - p_segment_begin;
+	Vector3 D = p_segment_begin - p_circle_center;
+	Vector3 NxM = p_circle_normal.cross(segment_direction);
+	Vector3 NxD = p_circle_normal.cross(D);
+
+	if (NxM != Vector3()) {
+		if (NxD != Vector3()) {
+			real_t NdM = p_circle_normal.dot(segment_direction);
+			if (NdM != 0.0) {
+				real_t a = NxM.dot(NxM);
+				real_t b = NxM.dot(NxD);
+				real_t c = NxD.dot(NxD);
+				real_t d = segment_direction.dot(D);
+				real_t rSqr = p_circle_radius * p_circle_radius;
+				real_t aSqr = a * a;
+				real_t bSqr = b * b;
+				real_t dSqr = d * d;
+				real_t h0 = c * dSqr - bSqr * rSqr;
+				real_t h1 = 2.0 * (c * d + b * dSqr - a * b * rSqr);
+				real_t h2 = c + 4.0 * b * d + a * dSqr - aSqr * rSqr;
+				real_t h3 = 2 * (b + a * d);
+				real_t h4 = a;
+				Vector<ClosestInfo> candidates;
+				Vector<real_t> segment_parameter_candidates = solve_quartic(h0, h1, h2, h3, h4);
+				size_t num_roots = 0;
+				for (const real_t segment_parameter : segment_parameter_candidates) {
+					ClosestInfo candidate_info;
+					Vector3 NxDelta = NxD + segment_parameter * NxM;
+					if (NxDelta != Vector3()) {
+						get_points_from_segment_parameter(p_circle_center, p_circle_normal, p_circle_radius, p_segment_begin, p_segment_end, segment_parameter, candidate_info.circle_closest, candidate_info.segment_closest);
+						//candidate_info.equidistant = false;
+					} else {
+						// TODO: explain this case geometrically. line is along vector normal?
+						// TODO: this is correct only for line, not necessarily for segment
+						Vector3 U = get_some_orthogonal_vector(p_circle_normal, true);
+						candidate_info.segment_closest = p_circle_center;
+						candidate_info.circle_closest = p_circle_center + p_circle_radius * U;
+						//candidate_info.equidistant = true;
+					}
+					Vector3 diff = candidate_info.segment_closest - candidate_info.circle_closest;
+					candidate_info.sqr_distance = diff.dot(diff);
+					//candidates[num_roots++] = candidate_info;
+					num_roots++;
+					candidates.push_back(candidate_info);
+				}
+
+				if (candidates.size() > 0) { // TODO: necessary?
+
+					//std::sort(candidates.begin(), candidates.begin() + num_roots);
+					candidates.sort_custom<ClosestInfoSort>();
+
+					// TODO: care about multiple solutions?
+					r_circle_closest = candidates[0].circle_closest;
+					r_segment_closest = candidates[0].segment_closest;
+				} else {
+					return;
+				}
+			} else {
+				// The segment is parallel to the plane of the circle.
+
+				// TODO: check if this is valid for segment instead of line.
+
+				real_t u = NxM.dot(D);
+				real_t v = segment_direction.dot(D);
+				real_t discr = p_circle_radius * p_circle_radius - u * u;
+
+				if (discr > 0.0) {
+					real_t root_discr = Math::sqrt(discr);
+					real_t segment_parameter = -v + root_discr;
+					get_points_from_segment_parameter(p_circle_center, p_circle_normal, p_circle_radius, p_segment_begin, p_segment_end, segment_parameter, r_circle_closest, r_segment_closest);
+					// TODO: care about other solution?
+				} else {
+					real_t segment_parameter = -v;
+					get_points_from_segment_parameter(p_circle_center, p_circle_normal, p_circle_radius, p_segment_begin, p_segment_end, segment_parameter, r_circle_closest, r_segment_closest);
+				}
+			}
+		} else {
+			// The line is C+t*M, where M is not parallel to N.
+			// TODO: explain
+			// TODO: check if valid for segment instead of line
+			real_t segment_parameter = p_circle_radius * NxM.length();
+			get_points_from_segment_parameter(p_circle_center, p_circle_normal, p_circle_radius, p_segment_begin, p_segment_end, segment_parameter, r_circle_closest, r_segment_closest);
+			// TODO: care about other solution?
+		}
+		// output.equidistant = false
+	} else {
+		if (NxD != Vector3()) {
+			// The line is A+t*N (perpendicular to plane) but with A != C
+			// TODO: explain
+			// TODO: check if valid for segment instead of line
+			real_t segment_parameter = -segment_direction.dot(D);
+			get_points_from_segment_parameter(p_circle_center, p_circle_normal, p_circle_radius, p_segment_begin, p_segment_end, segment_parameter, r_circle_closest, r_segment_closest);
+			// output.equidistant = false
+		} else {
+			// The line is C+t*N, so C is the closest point for the line and all circle points are equidistant from it.
+			// TODO: explain
+			// TODO: check if valid for segment instead of line
+			Vector3 U = get_some_orthogonal_vector(p_circle_normal, true);
+			r_segment_closest = p_circle_center;
+			r_circle_closest = p_circle_center + p_circle_radius * U;
+			// output.equidistant = true
+		}
+	}
+	//Vector3 diff = r_segment_closest - r_segment_closest;
+	//real_t sqr_distance = diff.dot(diff);
+	//real_t distance = Math::sqrt(sqrt_distance);
 }
 
 void Geometry3D::MeshData::optimize_vertices() {

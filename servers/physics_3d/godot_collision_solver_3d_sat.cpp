@@ -1726,6 +1726,21 @@ static void _collision_capsule_cylinder(const GodotShape3D *p_a, const Transform
 		return;
 	}
 
+	Vector3 circle_closest;
+	Vector3 segment_closest;
+	Vector3 circle1_center = p_transform_b.origin + cylinder_B_axis * cylinder_B->get_height() * 0.5;
+	Geometry3D::get_closest_points_between_segment_and_circle(circle1_center, cylinder_B_axis, cylinder_B->get_radius(), capsule_A_ball_1, capsule_A_ball_2, circle_closest, segment_closest);
+	Vector3 axis1 = (circle_closest - segment_closest).normalized();
+	if (axis1 != Vector3() && !separator.test_axis(axis1)) {
+		return;
+	}
+	Vector3 circle2_center = p_transform_b.origin - cylinder_B_axis * cylinder_B->get_height() * 0.5;
+	Geometry3D::get_closest_points_between_segment_and_circle(circle2_center, -cylinder_B_axis, cylinder_B->get_radius(), capsule_A_ball_1, capsule_A_ball_2, circle_closest, segment_closest);
+	Vector3 axis2 = (circle_closest - segment_closest).normalized();
+	if (axis2 != Vector3() && !separator.test_axis(axis2)) {
+		return;
+	}
+
 	GodotCollisionSolver3D::CallbackResult callback = SeparatorAxisTest<GodotCapsuleShape3D, GodotCylinderShape3D, withMargin>::test_contact_points;
 
 	// Fallback to generic algorithm to find the best separating axis.

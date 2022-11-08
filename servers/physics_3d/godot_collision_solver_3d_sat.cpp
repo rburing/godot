@@ -1726,6 +1726,30 @@ static void _collision_capsule_cylinder(const GodotShape3D *p_a, const Transform
 		return;
 	}
 
+	// Get axes from closest points between capsule axis and cylinder end caps.
+	Vector<Vector3> circle_closest;
+	circle_closest.resize_zeroed(2);
+	Vector<Vector3> line_closest;
+	line_closest.resize_zeroed(2);
+	size_t num_closest_pairs = 0;
+	bool equidistant;
+	Vector3 cylinder_B_circle1_center = p_transform_b.origin + cylinder_B_axis * cylinder_B->get_height() * 0.5;
+	Geometry3D::get_closest_points_between_line_and_circle(p_transform_a.origin, capsule_A_axis, cylinder_B_circle1_center, cylinder_B_axis, cylinder_B->get_radius(), line_closest, circle_closest, num_closest_pairs, equidistant);
+	for (size_t i = 0; i < num_closest_pairs; i++) {
+		Vector3 axis1 = (circle_closest[i] - line_closest[i]).normalized();
+		if (axis1 != Vector3() && !separator.test_axis(axis1)) {
+			return;
+		}
+	}
+	Vector3 cylinder_B_circle2_center = p_transform_b.origin - cylinder_B_axis * cylinder_B->get_height() * 0.5;
+	Geometry3D::get_closest_points_between_line_and_circle(p_transform_a.origin, capsule_A_axis, cylinder_B_circle2_center, -cylinder_B_axis, cylinder_B->get_radius(), line_closest, circle_closest, num_closest_pairs, equidistant);
+	for (size_t i = 0; i < num_closest_pairs; i++) {
+		Vector3 axis2 = (circle_closest[i] - line_closest[i]).normalized();
+		if (axis2 != Vector3() && !separator.test_axis(axis2)) {
+			return;
+		}
+	}
+
 	GodotCollisionSolver3D::CallbackResult callback = SeparatorAxisTest<GodotCapsuleShape3D, GodotCylinderShape3D, withMargin>::test_contact_points;
 
 	// Fallback to generic algorithm to find the best separating axis.

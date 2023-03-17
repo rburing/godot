@@ -34,6 +34,9 @@
 #include "thirdparty/misc/clipper.hpp"
 #include "thirdparty/misc/polypartition.h"
 
+// XXX
+#include "core/string/print_string.h"
+
 constexpr real_t LINE_CIRCLE_RELATIVE_TOLERANCE = 1e-6;
 constexpr real_t CIRCLE_CIRCLE_RELATIVE_TOLERANCE = 1e-6;
 
@@ -1030,6 +1033,12 @@ real_t line_circle_distance(void *p_data, real_t p_t) { // p_t is the line param
 	return distance_data->A[0] + p_t * (distance_data->A[1] + p_t) + distance_data->A[2] * distance_data->distCN;
 }
 
+void print_line_circle_distance_data(void *p_data) {
+	LineCircleDistanceData *distance_data = static_cast<LineCircleDistanceData *>(p_data);
+	print_line("\"A\": [", distance_data->A[0], ",", distance_data->A[1], ",", distance_data->A[2], ",", distance_data->A[3], ",", distance_data->A[4], ",", distance_data->A[5], "],");
+	print_line("\"B\": [", distance_data->B[0], ",", distance_data->B[1], "],");
+}
+
 real_t line_circle_distance_derivative(void *p_data, real_t p_t) { // first derivative of line_circle_distance
 	LineCircleDistanceData *distance_data = static_cast<LineCircleDistanceData *>(p_data);
 	distance_data->update_t(p_t);
@@ -1109,17 +1118,29 @@ void Geometry3D::get_closest_points_between_line_and_circle(const Vector3 &p_lin
 	// For now, determine a bracketing triplet from an interval:
 	real_t r1 = p_circle_radius;
 	real_t start = (p_circle_transform.origin - p_line_origin).dot(p_line_direction);
-	real_t a = start - r1;
-	real_t b = start + r1;
+	// NOTE: We widen the interval in case the minimum happens to be exactly (start - r1) or (start + r1).
+	real_t a = start - r1 - 0.1;
+	real_t b = start + r1 + 0.1;
 	real_t c = 0.0;
 	real_t fa = 0.0;
 	real_t fb = 0.0;
 	real_t fc = 0.0;
+
+	// XXX
+	//printf("{\n\"f\": ");
+	//print_line_circle_distance_function(&data);
+	print_line("{");
+	print_line_circle_distance_data(&data);
+	print_line("\"a\" :", a, ",\n\"b\" :", b, ",");
+
 	Minimization::bracketing_triplet_from_interval(&data, &line_circle_distance, &a, &b, &c, &fa, &fb, &fc);
 
 	// Find a single local minimum of the distance function numerically, using a modification of Brent's minimization algorithm (making use of the derivative).
 	real_t loc_min_t = 0.0;
 	real_t loc_min_dist = Minimization::get_local_minimum(&data, &line_circle_distance, &line_circle_distance_derivative, a, b, c, LINE_CIRCLE_RELATIVE_TOLERANCE, &loc_min_t);
+
+	print_line("\"loc_min_dist\":", loc_min_dist, ",");
+	print_line("\"loc_min_t\":", loc_min_t, "\n},");
 
 	// Shift the distance function f(t) down by the local minimum D:
 	// f(t) = t^2 + a5*t + a4 + a3*sqrt(a2*t^2 + a1*t + a0)
@@ -1160,12 +1181,34 @@ void Geometry3D::get_closest_points_between_line_and_circle(const Vector3 &p_lin
 		Minimization::bracketing_triplet_from_interval(&data, &line_circle_distance, &a, &b, &c, &fa, &fb, &fc);
 		loc_min_dist = Minimization::get_local_minimum(&data, &line_circle_distance, &line_circle_distance_derivative, a, b, c, LINE_CIRCLE_RELATIVE_TOLERANCE, &loc_min_t);
 	}
+
 	// NOTE: If the quadratic has just one real root, then the previously found local minimum is a global minimum, and so is the root of the quadratic.
 	// If the quadratic has no real roots, then the previously found local minimum is the unique global minimum.
 
 	r_closest_points[0] = p_line_origin + loc_min_t * p_line_direction;
 	r_closest_points[1] = get_closest_point_on_circle(r_closest_points[0], p_circle_transform, p_circle_radius);
 	r_num_closest_pairs = 1;
+}
+
+void Geometry3D::test_line_circle_distance_minimization(Vector<real_t> p_A, Vector<real_t> p_B, real_t p_a, real_t p_b, real_t &r_param, real_t &r_dist) {
+	LineCircleDistanceData data;
+	data.A[0] = p_A[0];
+	data.A[1] = p_A[1];
+	data.A[2] = p_A[2];
+	data.A[3] = p_A[3];
+	data.A[4] = p_A[4];
+	data.A[5] = p_A[5];
+	data.B[0] = p_B[0];
+	data.B[1] = p_B[1];
+	real_t a = p_a;
+	real_t b = p_b;
+	real_t c = 0.0;
+	real_t fa = 0.0, fb = 0.0, fc = 0.0;
+	Minimization::bracketing_triplet_from_interval(&data, &line_circle_distance, &a, &b, &c, &fa, &fb, &fc);
+	real_t loc_min_t = 0.0;
+	real_t loc_min_dist = Minimization::get_local_minimum(&data, &line_circle_distance, &line_circle_distance_derivative, a, b, c, LINE_CIRCLE_RELATIVE_TOLERANCE, &loc_min_t);
+	r_param = loc_min_t;
+	r_dist = loc_min_dist;
 }
 
 /*

@@ -923,6 +923,13 @@ Vector<Vector3> Geometry3D::get_closest_points_between_line_and_circle(const Vec
 	return { closest_points[0], closest_points[1] };
 }
 
+Vector2 Geometry3D::test_line_circle_distance_minimization(Vector<real_t> p_A, Vector<real_t> p_B, real_t p_a, real_t p_b) {
+	real_t r_param = 0.0;
+	real_t r_dist = 0.0;
+	::Geometry3D::test_line_circle_distance_minimization(p_A, p_B, p_a, p_b, r_param, r_dist);
+	return Vector2(r_param, r_dist);
+}
+
 Vector<Vector3> Geometry3D::get_closest_points_between_circle_and_circle(const Transform3D &p_circle0_transform, const real_t p_circle0_radius, const Transform3D &p_circle1_transform, const real_t p_circle1_radius) {
 	Vector3 closest_points[2];
 	size_t num_closest_pairs = 0;
@@ -1003,6 +1010,7 @@ void Geometry3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_closest_point_to_segment_uncapped", "point", "s1", "s2"), &Geometry3D::get_closest_point_to_segment_uncapped);
 
 	ClassDB::bind_method(D_METHOD("get_closest_points_between_line_and_circle", "line_origin", "line_direction", "circle_transform", "circle_radius"), &Geometry3D::get_closest_points_between_line_and_circle);
+	ClassDB::bind_method(D_METHOD("test_line_circle_distance_minimization", "A", "B", "a", "b"), &Geometry3D::test_line_circle_distance_minimization);
 
 	ClassDB::bind_method(D_METHOD("get_closest_points_between_circle_and_circle", "circle0_transform", "circle0_radius", "circle1_transform", "circle1_radius"), &Geometry3D::get_closest_points_between_circle_and_circle);
 
